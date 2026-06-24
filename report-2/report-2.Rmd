@@ -1,0 +1,175 @@
+---
+title: "Lista lab 3"
+subtitle: "Modele regresji i ich zastosowania"
+author: "Ksawery Józefowski,   album 277513"
+date: "`r Sys.Date()`"
+output: 
+  pdf_document:
+    toc: true
+    fig_caption: yes
+    fig_width: 5 
+    fig_height: 4 
+    number_sections: true
+header-includes:
+   - \usepackage[OT4]{polski}
+   - \usepackage[utf8]{inputenc}
+   - \usepackage{graphicx}
+   - \usepackage{float}
+fontsize: 12pt 
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, cache = TRUE)
+knitr::opts_chunk$set(warning = FALSE, message = FALSE) 
+knitr::opts_chunk$set(fig.pos = "H", out.extra = "", fig.align = "center")
+```
+
+\newpage
+# Wstęp
+
+Wczytujemy dane z pliku *lab 3 (2026).xlsx*.
+```{r dane}
+library(kableExtra)
+library(readxl)
+dane <- read_excel("C:/Users/ksawe/Desktop/MREG/lab 3 (2026).xlsx")
+x <- dane$x
+y <- dane$y
+```
+
+
+# Zadanie 1
+
+```{r wskazniki-ogolne}
+x_bar <- mean(x)
+y_bar <- mean(y)
+
+beta1 <- sum((x - x_bar) * (y - y_bar)) / sum((x - x_bar)^2)
+beta0 <- y_bar - beta1 * x_bar
+
+y_hat <- beta0 + beta1 * x
+R2 <- sum((y_hat - y_bar)^2) / sum((y - y_bar)^2)
+
+e <- y - y_hat
+```
+
+```{r}
+# Histogram reszt
+hist(e,
+     main = "Histogram reszt",
+     xlab = "Reszty")
+
+# Wykres QQ
+qqnorm(e)
+qqline(e, col = "red")
+
+# Reszty vs dopasowane
+plot(y_hat, e,
+     main = "Reszty vs dopasowane",
+     xlab = "y_hat",
+     ylab = "reszty")
+abline(h = 0)
+
+# Reszty vs x
+plot(x, e,
+     main = "Reszty vs x",
+     xlab = "x",
+     ylab = "reszty")
+abline(h = 0)
+```
+
+Wnioski: Model regresji liniowej słabo opisuje zależność między zmiennymi, ponieważ współczynnik determinacji wynosi około `r R2`, a analiza reszt wskazuje jednak na obecność pojedynczych dużych odchyleń, co może sugerować występowanie obserwacji odstających. Wykresy zależności wskazują na występowanie zależności między resztami. Ogólnie model można uznać za poprawny, choć nie idealny.
+
+# Zadanie 2
+
+Wykres rozrzutu zmiennych $x,y$ jest przedstawiony na rysunku \ref{fig:wykres-rozrzutu-xy}
+```{r wykres-rozrzutu-xy, echo=TRUE, eval=TRUE, fig.cap="Wykres rozrzutu dla zmiennych x oraz y"}
+plot(x, y,
+     main = "Wykres rozrzutu dla zmiennych x oraz y",
+     xlab = "x",
+     ylab = "y")
+lines(x, y_hat, col = "red", lwd = 2)
+```
+
+
+Wnioski: Wykres rozrzutu wskazuje na nieliniowość trendu, dopiero od kokoło $x=15$ można stwierdzić, że zachowuje on się liniowo. Ogólnie trend zachowuje się logarytmicznie.
+
+# Zadanie 3
+
+```{r estymatory}
+x_tilde <- log(x)
+```
+
+Wnioski: Z histogramu dla reszt widać, że na początku występują duże ujemne błędy, a wykres rozrzutu wskazuje na szybki wzrost wartości danych na początku. Jak już wcześniej zauważyliśmy wskazuje to na nieliniowość trendu, a wręcz wygląda on logarytmicznie. Transformacja logarytmiczna idealnie będzie pasować do aktualnego zachowania trendu tym samym go liniaryzując go.
+
+# Zadanie 4
+
+```{r prognoza.sigma.kwadrat}
+x_bar_t <- mean(x_tilde)
+y_bar <- mean(y)
+
+beta1_t <- sum((x_tilde - x_bar_t) * (y - y_bar)) / sum((x_tilde - x_bar_t)^2)
+beta0_t <- y_bar - beta1_t * x_bar_t
+
+y_hat_t <- beta0_t + beta1_t * x_tilde
+
+R2_t <- sum((y_hat_t - y_bar)^2) / sum((y - y_bar)^2)
+e_t <- y - y_hat_t
+```
+
+```{r}
+plot(x, y)
+lines(x, y_hat_t, col = "red", lwd = 2)
+```
+
+```{r}
+# Histogram reszt
+hist(e_t,
+     main = "Histogram reszt",
+     xlab = "Reszty")
+
+# Wykres QQ
+qqnorm(e_t)
+qqline(e_t, col = "red")
+
+# Reszty vs dopasowane
+plot(y_hat_t, e_t,
+     main = "Reszty vs dopasowane",
+     xlab = "y_hat",
+     ylab = "reszty")
+abline(h = 0)
+
+# Reszty vs x
+plot(x, e_t,
+     main = "Reszty vs x",
+     xlab = "x",
+     ylab = "reszty")
+abline(h = 0)
+```
+
+Wnioski: Model po transformacji logarytmicznej bardzo dobrze opisuje zależność między zmiennymi, ponieważ współczynnik determinacji wynosi około `r R2_t`, a reszty wyglądają na losowe. Również wykres kwantylowy i histogram reszt wskazują na dobre dopasowanie do rozkładu normalnego.
+
+# Zadanie 5
+
+Model liniowy bez transformacji osiąga współczynnik determinacji `r R2`, co oznacza dobre dopasowanie, jednak analiza reszt wskazuje na pewną nieliniowość. Szczególnie dla małych wartości $X$ występują duże odchylenia, więc ogólnie dopasowanie jest słabe. 
+
+Po zastosowaniu transformacji logarytmicznej zmiennej $X$ wartość `r R2_t` wzrasta, a reszty mają bardziej losowy charakter i są lepiej rozproszone wokół zera. Również ich wykres kwantylowy jak i histogram bardziej przypominają rozkład normalny.
+
+Finalnie model z transformacją lepiej opisuje zależność między zmiennymi.
+
+# Zadanie 6
+
+```{r przedzial.ufnosci}
+tab <- data.frame(
+  Nr = 1:length(y),
+  Y_obserwowane = y,
+  Y_hat_stary = y_hat,
+  Y_hat_nowy = y_hat_t
+)
+
+kable(tab, digits = 3)
+```
+
+
+# Zadanie 7
+
+Transformacja zmiennej objaśniającej była opłacalna, ponieważ początkowe wartości prognozowane w nowym modelu są bliższe wartościom obserwowanym. Potwierdza to również wyższy współczynnik determinacji oraz lepsze własności reszt.

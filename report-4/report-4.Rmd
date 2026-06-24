@@ -1,0 +1,400 @@
+---
+title: "Raport z listy 6"
+subtitle: "Modele regresji i ich zastosowania"
+author: "Ksawery Józefowski,   album 277513"
+date: "`r Sys.Date()`"
+output: 
+  pdf_document:
+    toc: true
+    fig_caption: yes
+    fig_width: 5 
+    fig_height: 4 
+    number_sections: true
+header-includes:
+   - \usepackage[OT4]{polski}
+   - \usepackage[utf8]{inputenc}
+   - \usepackage{graphicx}
+   - \usepackage{float}
+fontsize: 12pt 
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_chunk$set(warning = FALSE, message = FALSE) 
+knitr::opts_chunk$set(fig.pos = "H", out.extra = "", fig.align = "center")
+
+set.seed(123)
+```
+
+
+
+# Wstęp
+<!-- Wczytaj do pakietu statystycznego dane z pliku 
+„regresja wielokrotna zmodyfikowana.csv”.
+-->
+
+Wczytujemy dane z pliku *regresja wielokrotna 2026.xlsx*.
+
+```{r dane}
+library(kableExtra)
+dane <- read.csv("C:/Users/ksawe/Desktop/MREG/lab6.csv")
+```
+
+
+
+```{r}
+X <- as.matrix(dane[, -8])
+Y <- as.matrix(dane[, 8])
+```
+
+
+# Zadanie 1
+<!-- 
+Wykorzystać regresję krokową z kryterium AIC do wyboru „najlepszego” 
+modelu regresji M.
+-->
+
+
+
+
+
+## Podpunkt (a)
+<!-- 
+(a)  Wyznaczyć estymator najmniejszych kwadratów beta w modelu M
+-->
+
+Wykorzystamy funkcję **step()**. 
+Na początek utworzymy model początkowy (tylko ze stałą) oraz model pełny
+(ze wszystkimi predyktorami).
+
+```{r}
+model.initial <- lm(Y ~ 1, data = dane)
+
+model.full <- lm(Y ~ ., data = dane)
+```
+
+Zacznijmy od modelu regresji krokowej typu "forward".
+
+```{r, results="hide"}
+model.forward <- step(model.initial,
+                      scope = list(lower = model.initial, upper = model.full),
+                      direction = "forward")
+```
+Wniosek: Regresja krokowa typu forward stopniowo włączała do modelu zmienne w następującej kolejności: $X_6, X_2, X_4, X_3, X_7, X_1$. Zmienna objaśniająca $X_5$ nie została uwzględniona w modelu, co wskazuje na jej brak istotnego wpływu na zmienną objaśnianą.
+
+
+Następnie sprawdźmy model regresji krokowej typu "backward".
+```{r, results="hide"}
+model.backward <- step(model.full,
+                       direction = "backward")
+```
+Wniosek: Regresja krokowa typu backward rozpoczęła się od pełnego modelu zawierającego wszystkie zmienne, a następnie usunęła zmienną $X_5$. Ostatecznie w modelu pozostały zmienne $X_1, X_2, X_3, X_4, X_6, X_7$, co potwierdza, że (X_5) nie miała istotnego wpływu.
+
+
+Na koniec zobaczmy jeszce jak wygląda model regresji krokowej typu "both".
+```{r, results="hide"}
+model.both <- step(model.initial,
+                   scope = list(lower = model.initial, upper = model.full),
+                   direction = "both")
+```
+Tutaj również usunięty został predyktor $X_5$.
+
+Zatem do dalszej analizy wykorzystujemy model backward i oznaczamy go $M$, dodatkowo z modelu wyłączamy zmienną objaśniającą $X_5$
+```{r}
+M <- model.backward
+X.M <- X[,-5]
+```
+
+
+
+## Podpunkt (b)
+<!-- 
+(b)  Sprawdzić, czy którakolwiek ze zmiennych objaśniających w modelu M 
+ma liniowy wpływ na zmienną objaśnianą. Odpowiedź uzasadnić, 
+podając p-wartość odpowiedniego testu.
+-->
+
+Do zweryfikowania hipotezy zerowej
+$$
+ H_0: \quad \beta_1 = \beta_2 = \ldots = \beta_{p-2}= \beta_{p-1} = 0,
+$$
+
+przy alternatywie 
+$$
+ H_1: \quad \beta_1 \neq 0 \quad\vee\quad \beta_2 \neq 0 \quad\vee\quad \ldots \quad\vee\quad \beta_{p-2} \neq 0 \quad\vee\quad \beta_{p-1} \neq 0,
+$$
+wykorzystamy statystykę testową $F$ określoną następująco:
+
+$$
+F\colon = \frac{SSR}{SSE} \cdot \frac{n-p}{p-1},
+$$
+gdzie
+\begin{itemize}
+\item $n$ jest długością próby,
+\item $p$ jest liczbą zmiennych objaśniających powiększoną o jeden (zmienną $X_0=1$),
+\item $SSE = \sum\limits_{i=1}^{n}(y_i-\hat{y_i})^2$,
+\item $SSR = \sum\limits_{i=1}^{n}(\hat{y_i}-\overline{y})^2$
+\end{itemize}
+
+Hipotezę $H_0$ odrzucamy, gdy p-wartość określona jako
+
+$$
+p-value = \mathbb{P}_{H_0}(F\geq F_{obs}) = 
+1 - F_{p-1, n-p}(F_{obs})
+$$
+spełnia
+$$
+p-value \leq \alpha
+$$
+dla ustalonego wcześniej poziomu istotności $\alpha$, przy czym $F_{m_1,m_2}(t)$
+jest dystrybuantą rozkładu F Snedecora, z $m_1,m_2$ stopniami swobody, 
+ewaluowaną w punkcie $t$.
+
+Opisany test został zaimplementowany w funkcji \textit{test.F()}.
+
+```{r test.F}
+
+test.F<-function(x,y,y.hat){
+
+  # liczba zmiennych plus 1 (wyraz wolny w modelu regresji)
+  p<-length(x[1,])+1
+  
+  # liczba obserwacji
+  n<-length(x[,1])
+  
+  # SSR oraz SSE zgodnie ze wzorami
+  SSR<-sum((y.hat-mean(y))^2)
+  SSE<-sum((y-y.hat)^2)
+  
+  # wartosć statystyki testowej
+  F.stat<-SSR/(p-1)/SSE*(n-p)
+  
+  # p-wartość testu
+  p.value<-pf(F.stat,df1=p-1,df2=n-p,lower.tail=FALSE)
+return(p.value)}
+
+```
+
+
+```{r}
+Y.hat <- M$fitted.values
+p.value <- test.F(X.M, Y, Y.hat)
+```
+Skoro p-value `r p.value` jest mniejsze niż zakładany poziom istotności $\alpha = 0.05$ to odrzucamy hipotezę zerową, czyli chociaż jedna zmienna objaśniająca ma istotny liniowy wpływ na zmienna objaśnianą, więc model ma sens.
+
+## Podpunkt (c)
+<!-- 
+(c) Dla każdej zmiennej objaśniającej z modelu M sprawdzić, czy ma
+ona liniowy wpływ na zmienną objaśnianą przy uwzględnieniu pozostałych 
+zmiennych objaśniających w modelu. 
+Podać p-wartość odpowiedniego testu i sformułować wniosek.
+-->
+
+Do zweryfikowania hipotezy zerowej
+$$
+ H_{0}^{(i)}: \quad \beta_i = 0,
+$$
+
+przy alternatywie 
+$$
+ H_{1}^{(i)}: \quad \beta_i \neq 0,
+$$
+wykorzystamy statystykę testową $F_i$ określoną następująco:
+
+$$
+F_i\colon = \frac{\hat{\beta_i^2}}{SE_i^2},
+$$
+gdzie $SE_i^2 = \hat{\sigma^2} (X^T X)^{-1}_{i,i}$.
+
+Przy założeniu, że $H_{0}^{(i)}$ jest prawdziwa $F_i$ ma rozkład F Snedecora
+$F(1, n - p)$ z jednym i $n - p$ stopniami swobody.
+
+Co więcej, statystyka ta ma również rozkład taki sam rozkład jak $[T(n - p)]^2$,
+czyli kwadrat zmiennej losowej T-studenta z $n - p$ stopniami swobody.
+
+Hipotezę $H_{0}^{(i)}$ odrzucimy, gdy 
+$$
+p-value = 1-F_{F(1,n-p)}(F_{i,obs})]
+$$
+spełnia $p-value \leq \alpha$, gdzie $\alpha$ to ustalony poziom istotności, 
+natomiast $F_{F(m_1,m_2)}(t)$ jest dystrybuantą rozkładu F Snedecora 
+z z $m_1,m_2$ stopniami swobody ewaluowaną w punkcie $t$.
+
+Ten test został zaimplementowany w funkcji test.F.single().
+
+```{r}
+sigma.est<-function(y,y.hat,beta){
+  return(sum((y-y.hat)^2)/(length(y)-length(beta)))}
+```
+
+
+```{r test.F.single}
+test.F.single<-function(x,y,y.est,beta){
+  sigma <- sigma.est(y,y.est,beta)
+  x <- cbind(rep(1,length(x)),x)
+  SE <- sigma * diag(solve(t(x)%*%x))
+
+  F.stat <- (beta^2)/SE
+  
+  p.value.single <- pf(F.stat, df1=1, df2=length(x)-length(beta),
+                       lower.tail=FALSE)
+  
+  return(p.value.single)
+}
+```
+
+
+```{r}
+p.value.single <- test.F.single(X.M, Y, Y.hat, M$coefficients)
+kable(p.value.single)
+```
+
+Zatem każda ze zmiennych objaśniających ma liniowy wypływ na zmienną objaśnianą, ponieważ każde p-value jest poniżej ustalonego poziomu istotności, więc dla każdego odrzucamy hipotezę $H_0$
+
+## Podpunkt (d)
+<!-- 
+(d) Wyznaczyć przedziały ufności na poziomie 0,95 dla współczynników regresji 
+odpowiadających zmiennym z modelu M.
+-->
+
+Przedział ufności $[T_L(X), T_U(x)]$ na poziomie ufności $1-\alpha$ 
+dla parametrów $\beta_i$, przy założeniu, że 
+$\varepsilon_1, \varepsilon_2,\ldots,\varepsilon_n$ są i.i.d o rozkładzie 
+$\mathcal{N}(0,\sigma^2)$ wyznaczamy ze wzorów
+
+$$
+T_L(X) = \hat{\beta_i}-t_{n-p}(1-\alpha/2)\cdot SE_i, \qquad T_U(X) = \hat{\beta_i} + t_{n-p}(1-\alpha/2)\cdot SE_i,
+$$
+gdzie $t_{n-p}(1-\alpha/2)$ jest kwantylem rzędu $1-\alpha/2$ rozkładu 
+$T(n-p)$ t-Studenta z $n-p$ stopniami swobody.
+
+
+```{r}
+przedziały.ufności<-function(x,y,y.est,beta,alpha){
+  sigma <- sigma.est(y,y.est,beta)
+  x <- cbind(rep(1,length(x)),x)
+  SE <- sigma * diag(solve(t(x)%*%x))
+  
+  t.value <- qt(1-alpha/2, df=length(x)-length(beta))
+  
+  t.lower <- beta - t.value * sqrt(SE)
+  t.upper <- beta + t.value * sqrt(SE)
+  
+  przedziały <- cbind(t.lower, beta, t.upper)
+  
+  return(przedziały)
+}
+```
+
+
+```{r}
+przedziały <- przedziały.ufności(X.M, Y, Y.hat, 
+                                 M$coefficients, 0.05)
+kable(przedziały)
+```
+
+Wnioski: Żaden z przedziałów ufności nie obejmuje zera, co oznacza, że wszystkie zmienne objaśniające są statystycznie istotne.
+
+## Podpunkt (e)
+<!-- 
+(e) Wyznaczyć skorygowany współczynnik determinacji R2adj w modelu M.
+-->
+
+
+
+```{r}
+# funkcja jak na liście 4
+współczynnik.determinacji<-function(y,y.est){
+  return(sum((y.est-mean(y))^2)/sum((y-mean(y))^2))
+}
+
+# funkcja jak na liście 4
+skorygowany.współczynnik.determinacji<-function(R2,n,p){
+  return(1-((1-R2)*(n-1))/(n-p-1))
+}
+```
+
+
+```{r}
+R2 <- współczynnik.determinacji(Y, Y.hat)
+
+Adj.R2 <- skorygowany.współczynnik.determinacji(
+  R2,
+  length(Y),
+  length(M$coefficients)
+)
+
+```
+
+Wnioski: Współczynnik determinacji `r R2` oraz skorygowany współczynnik `r Adj.R2` wskazują na bardzo dobre dopasowanie modelu do danych. Niewielka różnica między tymi wartościami sugeruje, że model nie jest przeparametryzowany, a uwzględnione zmienne objaśniające w istotny sposób wyjaśniają zmienność zmiennej zależnej. Model dobrze dopasowywuje się do danych.
+
+
+# Zadanie 2
+<!-- 
+Przeanalizować zachowanie reszt w modelu M w celu sprawdzenia, czy
+spełnione są założenia modelu regresji liniowej. W tym celu wykonać:
+-->
+
+
+
+## Podpunkt (a)
+<!-- 
+(a) wykresy kwantylowe reszt,
+-->
+
+```{r}
+e <- Y - Y.hat
+```
+
+
+```{r rezydua_wykres_kwantylowy, echo=FALSE, fig.cap="Wykres kwantylowy rezyduów"}
+qqnorm(e)
+qqline(e)
+```
+Wnioski: Wykres kwantylowy \ref{fig:rezydua_wykres_kwantylowy} wygląda dobrze i wskazuje na to, że reszty zachowują się jak reszty dla rozkładzu normalnego
+
+
+## Podpunkt (b)
+<!-- 
+(b) wykresy reszt względem każdej ze zmiennych objaśniających,
+-->
+
+Wykres rozrzutu rezyduów względem każdej ze zmiennych objaśniających 
+$X_i$ dla $i=1,2,3,4,6,7$ jest przedstawiony na rysunku \ref{fig:rezydua_rozrzut_x}.
+
+```{r rezydua_rozrzut_x, fig.cap="Wykres rozrzutu rezyduów względem wartości zmiennej x"}
+par(mfrow=c(2,3), mar=c(6,4,2,1))
+
+idx <- c(1,2,3,4,6,7)
+
+for(i in 1:ncol(X.M)){
+  plot(X.M[, i], e,
+       xlab = colnames(X.M)[i],
+       ylab = "Reszty",
+       main = paste("Reszty ", colnames(X.M)[i]))
+  abline(h = 0, col = "red")
+}
+
+par(mfrow=c(1,1))
+```
+
+Z wykresu \ref{fig:rezydua_rozrzut_x} zauważamy, że reszty w porównaniu do każdej zmiennej objaśniającej zachowują się losowo. Oznacza to, że model jest liniowy, a reszty nie są skorelowane ze zmiennymi.
+
+
+## Podpunkt (c)
+<!-- 
+(c) wykresy reszt względem wartości przewidywanych przez model.
+Sformułować wnioski wynikające z przeprowadzonej analizy.
+-->
+
+
+Wykres rozrzutu rezyduów względem estymowanych wartości jest przedstawiony na rysunku \ref{fig:rezydua_rozrzut_prognozy}.
+```{r rezydua_rozrzut_prognozy, echo=FALSE, fig.cap="Wykres rozrzutu rezyduów względem prognoz"}
+plot(Y.hat, e,
+     xlab="Wartości przewidywane",
+     ylab="Reszty")
+abline(h=0, col="red")
+```
+
+Wykres \ref{fig:rezydua_rozrzut_prognozy} pokazuje losową chmurę punktów co wskazuje, że reszty i wartości predyktowane nie są skorelowane.
+

@@ -1,0 +1,558 @@
+---
+title: "Raport z listy 4"
+subtitle: "Modele regresji i ich zastosowania"
+author: "Ksawery Józefowski,   album 277513"
+date: "`r Sys.Date()`"
+output: 
+  pdf_document:
+    toc: true
+    fig_caption: yes
+    fig_width: 5 
+    fig_height: 4 
+    number_sections: true
+header-includes:
+   - \usepackage[OT4]{polski}
+   - \usepackage[utf8]{inputenc}
+   - \usepackage{graphicx}
+   - \usepackage{float}
+fontsize: 12pt 
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_chunk$set(warning = FALSE, message = FALSE) 
+knitr::opts_chunk$set(fig.pos = "H", out.extra = "", fig.align = "center")
+
+set.seed(123)
+```
+
+
+# Wstęp
+<!-- Wczytaj do pakietu statystycznego dane z pliku 
+„regresja wielokrotna 2026.xlsx”.
+-->
+
+Wczytujemy dane z pliku *regresja wielokrotna 2026.xlsx*.
+```{r dane}
+library(openxlsx)
+library(kableExtra)
+dane <- read.xlsx("C:/Users/ksawe/Desktop/MREG/lab4.xlsx")
+dane.2 <- dane
+```
+
+
+# Zadanie 1
+<!-- 
+Dla każdej z par zmiennych (Y, Xi),(Xi, Xj ) wykonaj wykres rozrzutu.
+Przeanalizuj otrzymane rysunki i odpowiedz na następujące pytania:
+-->
+ 
+```{r wykres rozrzutu}
+pairs(dane.2, cex=0.5)
+``` 
+
+
+## Podpunkt (a)
+<!-- 
+(a) Które ze zmiennych objaśniających mogą mieć liniowy wpływ na 
+zmienną objaśnianą Y ?
+-->
+
+Potencjalne zmienne objaśniające, które mogą mieć linowy wpływ na zmienną objaśnianą to na przykłąd $X6$, któej wykres rozrzutu najbardziej przypomina trend liniowy, pozostałe które potencjalnie zachowują się liniowo to $X8, X9, X10$.
+
+
+## Podpunkt (b)
+<!-- 
+(b) Czy pojawia się problem współliniowości, to znaczy, czy istnieje choć jedna
+para silnie ze sobą skorelowanych zmiennych objaśniających?
+-->
+
+Tak pojawia się problem współliniowości, głównie między parami \newline
+$(X2,X8), (X6,X9), (X2,X10), (X8,X10)$
+
+
+## Podpunkt (c)
+<!-- 
+(c) Czy pojawiają się obserwacje odstające?
+-->
+
+Tak, na wykresach można zauważyć obserwacje, które znacznie odstają od występujących czarnych skupisk.
+
+
+
+
+
+# Zadanie 2
+<!-- 
+Wyznacz macierz korelacji próbkowych dla zmiennych Y, X1, . . . , Xp−1
+i po przeanalizowaniu tak otrzymanych współczynników ponownie odpowiedz 
+na pytania (a) i (b) z poprzedniego punktu.
+-->
+
+Próbkowy współczynnik korelacji Pearsona wyraża się wzorem
+$$
+r=\frac{\sum\limits_{i=1}^{n}(x_i - \overline{x}) \cdot (y_i - \overline{y})}{\sqrt{\sum\limits_{i=1}^{n}(x_i - \overline{x})^2\cdot \sum\limits_{i=1}^{n}(y_i - \overline{y})^2}}
+$$
+i jest zaimplementowany w funkcji *cor()*.
+
+```{r}
+kable(cor(dane.2), digits=3)
+```
+
+
+## Podpunkt (a)
+
+Współczynnik korelacji potwierdza, że zmienna objaśniająca $X6$ jest "najlepiej" liniowa względem $Y$, również zmienne $X8$ i $X9$ są w miarę liniowe względem $Y$
+
+## Podpunkt (b)
+
+Tak pojawia się problem współliniowości, teraz potwierdzony przez korelacje między nimi, głównie dla par $(X2,X8), (X6,X9), (X2,X10), (X8,X10)$
+
+
+# Zadanie 3
+<!-- 
+Skonstruuj model regresji liniowej opisujący zależność między zmienną
+Y a zmiennymi objaśniającymi X1, . . . , Xp−1.
+-->
+Konstruujemy model regresji liniowej opisujący zależność pomiędzy zmienną 
+objaśnianą $Y$ a zamiennymi objaśniającymi $X_1,X_2,\ldots,X_{10}$.
+
+W tym celu wyznaczymy estymator 
+$$
+\hat{\beta}=(\hat{\beta_1},\hat{\beta_2},\ldots,\hat{\beta_{10}})
+$$
+
+parametrów 
+$$
+\beta=(\beta_1,\beta_2,\ldots,\beta_{10})
+$$
+tego modelu regresji liniowej.
+
+
+## Podpunkt (a)
+<!--
+(a) Wyznacz estymator najmniejszych kwadratów \beta.
+-->
+
+Posłużymy sie metodą najmniejszych kwadratów. Wówczas mamy
+
+$$
+\hat{\beta} =(\mathbb{X}^T \mathbb{X})^{-1}\mathbb{X}^T Y
+$$
+Wzór ten jest zaimplementowany w funkcji \textit{estymatory.beta()}.
+
+```{r}
+estymatory.beta<-function(x,y){
+  wektor.1 <- rep(1, length(y))
+  x <- cbind(wektor.1, x)
+  beta <- solve(t(x) %*% x) %*% (t(x) %*% y)
+  
+  return(beta)
+}
+```
+
+
+```{r}
+X <- as.matrix(dane[, -11])
+Y <- as.matrix(dane[, 11])
+
+beta <- estymatory.beta(X, Y)
+kable(beta, digits=3)
+```
+
+
+## Podpunkt (b)
+<!--
+(b) Czy którakolwiek ze zmiennych objaśniających z tego (pełnego)
+modelu ma liniowy wpływ na zmienną objaśnianą? Odpowiedź
+uzasadnij podając p-wartość testu F. Sformułuj hipotezę zerową
+oraz hipotezę alternatywną w tym teście?
+-->
+
+Funkcja \textit{prognoza()} implementuje wzór na predykcje:
+$$
+\hat{Y} = \mathbb{X}\hat{\beta}.
+$$
+
+
+```{r prognoza}
+prognoza<-function(x,beta){
+ wektor.1 <- rep(1, length(x[,1]))
+ x <- cbind(wektor.1, x)
+ return(x %*% beta)
+ }
+
+Y.hat <- prognoza(X, beta)
+```
+
+Do zweryfikowania hipotezy zerowej
+$$
+ H_0: \quad \beta_1 = \beta_2 = \ldots = \beta_{p-2}= \beta_{p-1} = 0,
+$$
+
+przy alternatywie 
+$$
+ H_1: \quad \beta_1 \neq 0 \quad\vee\quad \beta_2 \neq 0 \quad\vee\quad \ldots \quad\vee\quad \beta_{p-2} \neq 0 \quad\vee\quad \beta_{p-1} \neq 0,
+$$
+wykorzystamy statystykę testową $F$ określoną następująco:
+
+$$
+F = \frac{SSR}{SSE} \cdot \frac{n-p}{p-1},
+$$
+gdzie
+\begin{itemize}
+\item $n$ jest długością próby,
+\item $p$ jest liczbą zmiennych objaśniających powiększoną o jeden (zmienną $X_0=1$),
+\item $SSE = \sum\limits_{i=1}^{n}(y_i-\hat{y_i})^2$,
+\item $SSR = \sum\limits_{i=1}^{n}(\hat{y_i}-\overline{y})^2$
+\end{itemize}
+
+Hipotezę $H_0$ odrzucamy, gdy p-value określona jako
+
+$$
+p-value = \mathbb{P}_{H_0}(F\geq F_{obs}) = 
+1 - F_{p-1, n-p}(F_{obs})
+$$
+
+spełnia
+
+$$
+p-value \leq \alpha
+$$
+
+dla ustalonego wcześniej poziomu istotności $\alpha$, przy czym $F_{m_1,m_2}(t)$
+jest dystrybuantą rozkładu F Snedecora, z $m_1,m_2$ stopniami swobody, 
+ewaluowaną w punkcie $t$.
+
+Opisany test został zaimplementowany w funkcji \textit{test.F()}.
+
+```{r test.F}
+test.F<-function(x,y,y.hat){
+  p <- length(x[1,]) +1
+  n <- length(x[,1])
+  y.mean <- mean(y)
+  SSR <- sum((y.hat - y.mean)^2)
+  SSE <- sum((y.hat - y)^2)
+  F.stat <- (SSR / SSE) * ((n - p) / (p - 1))
+  p.value <- 1 - pf(F.stat, df1 = p - 1, df2 = n - p)
+return(p.value)}
+
+p.value <- test.F(X, Y, Y.hat)
+```
+Wartość p-value wynosi `r p.value`, więc odrzucamy hipotezę $H_0$, co oznacza, że co najmniej jedna zmienna objaśniająca ma istotny wpływ na zmienną objaśnianą.
+
+## Podpunkt (c)
+<!--
+(c) Wyznacz współczynniki determinacji R2 i AdjR2
+-->
+
+Wartości współczynnika determinacji obliczamy ze wzoru
+
+$$
+R^2 = \frac{\sum\limits_{i=1}^{n}(\hat{y_i}-\overline{y})^2}{\sum\limits_{i=1}^{n}(y_i-\overline{y})^2} 
+$$
+zaimplementowanego w funkcji \textit{współczynnik.determinacji()}.
+
+```{r R2.zwykly}
+współczynnik.determinacji<-function(y,y.est){
+  y.mean <- mean(y)
+  SSR <- sum((y.est - y.mean)^2)
+  SST <- sum((y - y.mean)^2)
+  return(SSR / SST)
+}
+
+R <- współczynnik.determinacji(Y, Y.hat)
+```
+
+Jego wartość wynosi `r R`, co świadczy o bardzo dobrym dopasowaniu modelu.
+
+Wartości skorygowanego współczynnika determinacji obliczamy ze wzoru
+
+$$
+Adj \ R^2 = 1-\frac{(1-R^2)\cdot (n-1)}{n-p-1}
+$$
+zaimplementowanego w funkcji \textit{skorygowany.współczynnik.determinacji()}.
+
+
+
+```{r R2.skorygowany}
+skorygowany.współczynnik.determinacji<-function(R,n,p){
+  return(1 - ((1 - R) * (n - 1)) / (n - p - 1))
+}
+
+R.adj <- skorygowany.współczynnik.determinacji(R, length(Y), length(beta))
+```
+Jego wartość wynosi `r R.adj`, skorygowany współczynnik determinacji wykazuje mniejszą wartość, niż zwykł współczynnik determinacji, ale nadal wskazuje na bardzo dobre dopasowanie modelu.
+
+# Zadanie 4
+<!-- 
+Rozwiąż problem współliniowości.
+-->
+
+## Podpunkt (a)
+<!-- 
+(a) Spośród zmiennych objaśniających, dla których VIF przekracza 10
+(lub równoważnie TOL := 1/VIF < 0.1), wybierz tę z największą
+wartością VIF i usuń ją z modelu.
+-->
+
+Współczynnik podbicia wariancji $VIF_j$ określamy wzorem
+
+$$
+VIF_j = \frac{1}{1-R_j^2,}
+$$
+
+gdzie $R_j^2$ jest współczynnikiem determinacji w modelu regresji liniowej, 
+w którym 
+\begin{itemize}
+\item zmienna $X_j$ jest zmienną objaśnianą,
+\item zmienne $X_0,X_1,\ldots,X_{j-1},X_{j+1},\ldots,X_{p-2},X_{p-1}$ są zmiennymi objaśniającymi
+\end{itemize}
+
+```{r VIF}
+VIF<-function(y,y.est){
+  vif <- 1 / (1 - współczynnik.determinacji(y, y.est))
+  return(vif)
+}
+```
+
+
+## Podpunkt (b)
+<!-- 
+(b) Oblicz wskaźniki podbicia wariancji w modelu regresji zawierającym 
+pozostałe zmienne objaśniające. Jeśli któryś z tych wskaźników jest większy od 10
+wróć do poprzedniego punktu, a jeśli nie to przejdź do dalszej części zadania. 
+-->
+
+W danym modelu odrzucamy zmienną $X_j$ o największej wartości $VIF_j$, jeżeli
+przekracza ona wartość $10$.
+
+Wartości współczynnika $VIF_j$ można obliczyć za pomocą funkcji \textit{VIF()}.
+
+```{r testowanie-VIF}
+testuj<-1:10
+
+while(TRUE){
+  Vif.value<-numeric(10)
+  
+  for (i in 1:10){
+    if (testuj[i]!=0){
+      indeksy <- setdiff(which(testuj>0), i)
+      b <- estymatory.beta(X[,indeksy], X[,i])
+      Y.h <- prognoza(X[,indeksy], b)
+      Vif.value[i] <- VIF(X[,i], Y.h)
+    }
+  }
+  
+  if (max(Vif.value) <= 10){
+    break
+  }
+  
+  idx <- which(Vif.value == max(Vif.value))
+  testuj[idx] <- 0
+}
+
+new.X.1 <- cbind(rep(1, length(X[,1])), X[,which(testuj>0)])
+new.X <- X[,which(testuj>0)]
+
+kable(testuj)
+```
+
+Jak możemy zauważyć w modelu pozostało $7$ z $10$ zmiennych objaśniających, co znaczy, że istniały istotne współkorelacje. Model dokładnie wyrzucił zmienne o numerach $8$, $9$ i $10$.
+
+# Zadanie 5
+<!-- 
+Zidentyfikuj i ewentualnie usuń z próby obserwacje, które mogą być
+wpływowe. W tym celu przeanalizuj
+
+(a) wpływy (leverages) kolejnych obserwacji, czyli liczby h11, . . . , hnn
+tworzące główną przekątna macierzy H,
+-->
+## Podpunkt (a)
+Określamy macierz $\mathbb{H}$ następująco:
+$$
+\mathbb{H}:=\mathbb{X}(\mathbb{X}^T \mathbb{X})^{-1}\mathbb{X}^T
+$$
+Wówczas wartość $x_j=(x_{1,j},x_{2,j},\ldots,x_{p-1,j})$ jest wpływowa,
+gdy 
+$$
+h_{j,j}>\frac{3p}{n}.
+$$
+
+Implementujemy wzór na macierz $\mathbb{H}$.
+
+```{r wplyw-macierz-H}
+macierz.H <- new.X.1 %*% solve(t(new.X.1) %*% new.X.1) %*% t(new.X.1)
+diagonal <- diag(macierz.H)
+p <- sum(testuj>0)
+u.1 <- which(diagonal > (3 * p / length(diagonal)))
+```
+
+
+Tworzymy wykres zależności wartości wpływów od numeru 
+obserwacji, z naniesionym progiem odcięcia równym $3p/n$.
+
+```{r wplyw-macierz-H-wykres-rozrzutu}
+n <- 200
+plot(x=1:n, y=diagonal[1:n],
+     xlab="indeks",
+     ylab="wpływ", 
+     main="Wartości wpływów dla kolejnych obserwacji")
+text(x=u.1, y=diagonal[u.1], labels=u.1, cex=0.7, pos=2)
+abline(h = 3*p/n, col="red")
+```
+Bazująca narazie tylko na wykresie wpływów kolejnych obserwacji, możemy stwierdzić, że obserwacje numer `r u.1` są wpływowe.
+
+<!--
+(c) studentyzowane rezydua r1, . . . , rn,
+
+By ułatwić identyfikację obserwacji wpływowych wykonaj wykres roz-
+proszenia dla punktów (1, D1),(2, D2), . . . ,(n, Dn), umieszczając na nim
+próg odcięcia (np. y = 4/(n−p)).
+-->
+## Podpunkt (c)
+Studentyzowane rezyduum $r_i$ jest zdefiniowane jako
+
+$$
+r_i = \frac{y_i-\hat{y}_i}{\hat{\sigma}\sqrt{1-h_{i,i}}},
+$$
+przy czym
+
+$$
+\hat{\sigma^2}=\frac{\sum\limits_{i=1}^{n}(y_i-\hat{y}_i)^2}{n-p}
+$$
+i ten estymator jest zaimplementowany w funkcji \textit{sigma.ext()}.
+
+Wówczas wartość $x_j=(x_{1,j},x_{2,j},\ldots,x_{p-1,j})$ jest wpływowa,
+gdy
+
+$$
+|r_i|>2.
+$$
+
+Estymator $\hat{\sigma^2}$ implementujemy w funkcji \textit{sigma.est()}.
+
+```{r}
+sigma.est<-function(y,y.hat,beta){
+  return(sum((y-y.hat)^2)/(length(y)-length(beta)))}
+```
+
+Wyznaczamy studentyzowane rezydua.
+
+```{r wplyw-studentyzowane-rezydua}
+new.beta <- estymatory.beta(new.X, Y)
+new.Y.hat <- prognoza(new.X, new.beta)
+new.sigma <- sigma.est(Y, new.Y.hat, new.beta)
+r <- (Y - new.Y.hat) / (new.sigma * sqrt(1 - diagonal))
+u.2 <- which(abs(r) > 2)
+```
+
+Tworzymy wykres zależności wartości studentyzowanych rezyduuów od numeru 
+obserwacji, z naniesionymi progami odcięcia równymi $2$ oraz $-2$.
+
+```{r wplyw-studentyzowane-rezydua-wykres-rozrzutu}
+n <- 200
+plot(x=1:n, y=r[1:n],
+     xlab="indeks",
+     ylab="wpływ", 
+     main="Wartości studentyzowanych rezyduów dla kolejnych obserwacji")
+text(x=u.2, y=r[u.2], labels=u.2, cex=0.7, pos=2)
+abline(h = 2, col="red")
+abline(h = -2, col="red")
+```
+
+Na wykresie studentyzowanych rezyduów dla kolejnych obserwacji, obserwacje, które są wpływowe według tego testu to `r u.2`
+
+<!--
+(b) odległości Cooke’a D1, . . . , Dn,
+-->
+## Podpunkt (b)
+Określamy odległość Cooka $D_i$ następująco:
+$$D_i = r_i^2 \cdot \frac{h_{i,i}}{1-h_{i,i}}\cdot \frac{1}{p},$$
+Wówczas wartość $x_j=(x_{1,j},x_{2,j},\ldots,x_{p-1,j})$ jest wpływowa,
+gdy
+
+$$
+D_i \geq \frac{4}{n-p}.
+$$
+
+Wyznaczmy odległości Cooke'a dla kolejnych obserwacji.
+
+```{r}
+D <- r^2 * (diagonal / (1 - diagonal)) * (1 / p)
+n <- length(Y)
+u.3 <- which(D >= (4 / (n - p)))
+```
+
+Tworzymy wykres zależności wartości odległości Cooke'a od numeru 
+obserwacji, z naniesionym progiem odcięcia równym $4/(n-p)$.
+
+```{r wplyw-odleglosc-Cooke-a-wykres-rozrzutu}
+n <- 200
+plot(x=1:n, y=D[1:n],
+     xlab="indeks",
+     ylab="wpływ", 
+     main="Wartości odległości Cooke’a dla kolejnych obserwacji")
+text(x=u.3, y=D[u.3], labels=u.3, cex=0.7, pos=2)
+abline(h = 4 / (n-p), col="red")
+```
+
+Z wykresu wartości odległości Cooke'a możemy odczytać, że według tego testu obserwacje wpłwowe to `r u.3`
+
+
+# Zadanie 6
+<!-- 
+Wykorzystując zmienne i obserwacje, które nie zostały usunięte, ponownie zbuduj
+model regresji liniowej opisujący zależność między zmienną Y a zmiennymi 
+objaśniającymi.
+
+(a) Wyznacz estymator najmniejszych kwadratów \beta.
+-->
+## Podpunkt (a)
+```{r beta.nowe}
+usuniete <- unique(c(u.1, u.2, u.3))
+new.X.2 <- new.X[-usuniete, ]
+new.Y.2 <- Y[-usuniete, ]
+new.beta.2 <- estymatory.beta(new.X.2, new.Y.2)
+
+kable(new.beta.2)
+```
+
+
+
+<!--
+(b) Czy którakolwiek ze zmiennych objaśniających z tego (pełnego) modelu ma 
+liniowy wpływ na zmienną objaśnianą? 
+Odpowiedź uzasadnij podając p-wartość testu F.
+-->
+
+## Podpunkt (b)
+
+```{r}
+new.Y.hat.2 <- prognoza(new.X.2, new.beta.2)
+p.value.nowe <- test.F(new.X.2, new.Y.2, new.Y.hat.2)
+```
+
+Tak, przynajmniej jedna ze zmiennych objaśniających ma liniowy wpływ na zmienną objaśnianą, ponieważ wartość p-value wynosi `r p.value.nowe`, co sugeruje, że powinniśmy odrzucić $H_0$ o nie wpływowości zmiennych objaśniających.
+
+<!--
+(c) Wyznacz współczynniki determinacji R2 i AdjR2. Czy po usunięciu niektórych 
+zmiennych lub obserwacji polepszyło się dopasowanie modelu do danych?
+-->
+
+## Podpunkt (c)
+
+```{r}
+R.nowe <- współczynnik.determinacji(new.Y.2, new.Y.hat.2)
+R.adj.nowe <- skorygowany.współczynnik.determinacji(
+  R.nowe,
+  length(new.Y.2),
+  length(new.beta.2)
+)
+```
+
+Wartość współczynnika determinacji i wersji skorygowanej odpowiednio wynoszą `r R.nowe` i `r R.adj.nowe`, co wskazuję na prawie idealne dopasowanie. Usunięcie niektórych zmiennych i obserwacji nie znacznie polepszyło dopasowanie modelu. Czyli ten model regresji ma sens.
+
+
+
+

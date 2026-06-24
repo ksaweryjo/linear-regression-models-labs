@@ -1,0 +1,111 @@
+---
+title: "Raport z listy 7"
+subtitle: "Modele regresji i ich zastosowania"
+author: "Ksawery Józefowski,   album 277513"
+date: "`r Sys.Date()`"
+output: 
+  pdf_document:
+    toc: true
+    fig_caption: yes
+    fig_width: 5 
+    fig_height: 4 
+    number_sections: true
+header-includes:
+   - \usepackage[OT4]{polski}
+   - \usepackage[utf8]{inputenc}
+   - \usepackage{graphicx}
+   - \usepackage{float}
+fontsize: 12pt 
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_chunk$set(warning = FALSE, message = FALSE) 
+knitr::opts_chunk$set(fig.pos = "H", out.extra = "", fig.align = "center")
+
+set.seed(123)
+```
+
+
+
+# Wstęp
+<!-- Wczytaj do pakietu statystycznego dane z pliku 
+„regresja wielokrotna zmodyfikowana.csv”.
+-->
+
+Wczytujemy dane z pliku.
+
+```{r dane}
+library(kableExtra)
+library(ppcor)
+library(readxl)
+library(car)
+dane <- read_excel("C:/Users/ksawe/Desktop/MREG/lab7.xlsx")
+```
+
+# Zadanie 1
+<!-- 
+Dla każdej pary zmiennych (Y, X1), (Y, X2), (Y, X3) porównać prób-
+kowy współczynnik korelacji z próbkowym współczynnikiem korelacji
+cząstkowej. Jakie różnice można zaobserwować?
+-->
+
+```{r}
+cor_X1 <- cor(dane$y, dane$X1)
+cor_X2 <- cor(dane$y, dane$X2)
+cor_X3 <- cor(dane$y, dane$X3)
+
+pcor_X1 <- pcor.test(dane$y, dane$X1, dane[, c("X2","X3")])$estimate
+pcor_X2 <- pcor.test(dane$y, dane$X2, dane[, c("X1","X3")])$estimate
+pcor_X3 <- pcor.test(dane$y, dane$X3, dane[, c("X1","X2")])$estimate
+```
+
+```{r, echo=FALSE}
+tabela <- data.frame(
+  Zmienna = c("X1", "X2", "X3"),
+  Korelacja = c(cor_X1, cor_X2, cor_X3),
+  Korelacja_czastkowa = c(pcor_X1, pcor_X2, pcor_X3)
+)
+
+kable(tabela, digits = 3,
+      caption = "Porównanie korelacji zwykłych i cząstkowych")
+```
+
+Wnioski: Dla X1 i X3 korelacje cząstkowe są wyższe niż korelacje proste, co wskazuje, że wpływ pozostałych zmiennych wcześniej osłabiał rzeczywistą zależność z Y. W przypadku X2 obserwujemy zmianę znaku korelacji z bliskiej zera na silnie ujemną, co sugeruje efekt maskowania i ujawnienie zależności dopiero po kontroli innych zmiennych.
+
+# Zadanie 2
+<!-- 
+Dla każdej pary zmiennych (Y, X1), (Y, X2), (Y, X3) porównać wykres
+rozrzutu z wykresem regresji cząstkowej (partial regression plot). Opi-
+sać zauważone różnice.
+-->
+```{r, echo=FALSE}
+# Y vs X1
+plot(dane$X1, dane$y,
+     main = "Y vs X1",
+     xlab = "X1", ylab = "Y")
+abline(lm(y ~ X1, data = dane), col = "red")
+
+# Y vs X2
+plot(dane$X2, dane$y,
+     main = "Y vs X2",
+     xlab = "X2", ylab = "Y")
+abline(lm(y ~ X2, data = dane), col = "red")
+
+# Y vs X3
+plot(dane$X3, dane$y,
+     main = "Y vs X3",
+     xlab = "X3", ylab = "Y")
+abline(lm(y ~ X3, data = dane), col = "red")
+```
+
+```{r}
+model <- lm(y ~ X1 + X2 + X3, data = dane)
+```
+```{r, echo=FALSE}
+avPlot(model, "X1")
+avPlot(model, "X2")
+avPlot(model, "X3")
+```
+
+Wnioski: Na wykresach rozrzutu dla zmiennej X2 widoczna jest losowa chmura punktów. Dla X1 można zauważyć słabą, ale dodatnią zależność, natomiast dla X3 pojawia się już wyraźniejszy trend wskazujący na umiarkowaną korelację. Z kolei wykresy regresji cząstkowej pokazują dla wszystkich zmiennych wyraźny, liniowy trend, co oznacza silniejszą i bardziej uporządkowaną zależność po usunięciu wpływu pozostałych zmiennych.

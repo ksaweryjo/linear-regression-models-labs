@@ -1,0 +1,457 @@
+---
+title: "Raport z listy 8"
+subtitle: "Modele regresji i ich zastosowania"
+author: "Ksawery Józefowski,   album 277513"
+date: "`r Sys.Date()`"
+output: 
+  pdf_document:
+    toc: true
+    fig_caption: yes
+    fig_width: 5 
+    fig_height: 4 
+    number_sections: true
+header-includes:
+   - \usepackage[OT4]{polski}
+   - \usepackage[utf8]{inputenc}
+   - \usepackage{graphicx}
+   - \usepackage{float}
+fontsize: 12pt 
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_chunk$set(warning = FALSE, message = FALSE) 
+knitr::opts_chunk$set(fig.pos = "H", out.extra = "", fig.align = "center")
+
+library(xtable)
+library(MASS)
+
+```
+
+
+
+# Wstęp
+Rozważamy model regresji nieliniowej
+$$Y=g(\mathbf{x}, \mathbf{\beta})+\varepsilon.$$
+Niech
+$$n=10,\qquad (\beta_1,\beta_2,\beta_3,\sigma)=(10,3,2,1/2)\qquad x_i=\frac{i}{2}\quad\text{dla}\quad i=1,2,\ldots,n.$$
+
+
+
+
+
+
+
+# Zadanie 1
+<!-- 
+Wygenerować n obserwacji y1, . . . , yn.
+-->
+
+Generujemy $n$ obserwacji $y_1,\ldots,y_n$ postaci
+$$y_i=\frac{\beta_1 x_i}{\beta_2 + x_i} + \beta_3 + \varepsilon_i,\quad i=1,2\ldots,n,$$
+gdzie $\varepsilon_1,\ldots,\varepsilon_n$ są niezależnymi zmiennymi losowymi 
+o rozkładzie $\mathcal{N}(0,\sigma^2)$.
+
+
+
+
+```{r}
+set.seed(123)
+n <- 10
+x <- (1:n) / 2
+beta.1 <- 10
+beta.2 <- 3
+beta.3 <- 2
+sigma.kwadrat <- (1/2)^2
+varepsilon <- rnorm(n, mean = 0, sd = sqrt(sigma.kwadrat))
+y <- (beta.1 * x) / (beta.2 + x) + beta.3 + varepsilon
+```
+
+
+
+
+# Zadanie 2
+<!-- 
+Podać wzór na funkcję g(x, β) oraz jej gradient.
+-->
+
+Funkcja $g$ jest postaci
+$$
+g(x, \mathbf{\beta}) 
+= \frac{\beta_1 x}{\beta_2 + x} + \beta_3
+$$
+Jej gradient $G$ jest postaci
+$$
+G(\mathbf{x}, \mathbf{\beta}) = \nabla g(\mathbf{x}, \mathbf{\beta}) 
+=
+\begin{bmatrix} 
+\dfrac{\partial g}{\partial \beta_1} \\
+\dfrac{\partial g}{\partial \beta_2} \\
+\dfrac{\partial g}{\partial \beta_3}
+\end{bmatrix}
+=
+\begin{bmatrix}
+\dfrac{x}{\beta_2 + x} \\
+-\dfrac{\beta_1 x}{(\beta_2 + x)^2} \\
+1
+\end{bmatrix}
+$$
+Implementujemy te wzory w funkcjach g() oraz gradient().
+
+```{r g}
+g <- function(x, beta.1, beta.2, beta.3) {
+  return((beta.1 * x) / (beta.2 + x) + beta.3)
+}
+```
+
+
+```{r gradient}
+gradient <- function(x, beta.1, beta.2, beta.3) {
+  g.1 <- x / (beta.2 + x)
+  g.2 <- -(beta.1 * x) / (beta.2 + x)^2
+  g.3 <- rep(1, length(x))
+  return(c(g.1, g.2, g.3))
+}
+```
+
+
+# Zadanie 3
+<!-- 
+Za pomocą algorytmu Gaussa–Newtona wyznaczyć estymatory parametrów 
+beta1, beta2, beta2, sigma^2.
+(a) Przyjąć odpowiedni punkt startowy algorytmu: (8,2,1)
+(b) Przyjąć odpowiednie kryterium stopu.
+-->
+
+
+Przyjmujemy następujące oznaczenia:
+
+\begin{itemize}
+  \item $X = [x_{i,j}] \in \mathcal{M}(\mathbb{R}^{n \times p})$ – macierz wartości realizacji zmiennych objaśniających,
+  
+  \item $Y = [y_1, y_2, \ldots, y_n]^T$ – wartości realizacji zmiennej objaśnianej,
+  
+  \item $\boldsymbol{\beta}^{(0)} \in \mathbb{R}^p$ – początkowa wartość wektora $\boldsymbol{\beta}$,
+  
+  \item $g(X;\boldsymbol{\beta}) =
+  \big[g(x_1;\boldsymbol{\beta}), g(x_2;\boldsymbol{\beta}), \ldots, g(x_n;\boldsymbol{\beta})\big]^T$
+  – wartości dla ustalonej funkcji $g$ w oparciu o zadane parametry $\boldsymbol{\beta}$ i wartości realizacji zmiennych objaśniających,
+  
+  \item $G^{(j)} =
+  \left[
+    \dfrac{\partial g(x_i;\boldsymbol{\beta})}{\partial \beta_j}
+  \right]_{i,j}
+  \in \mathcal{M}(\mathbb{R}^{n \times p})$
+  – macierz gradientów funkcji $g$,
+  
+  \item $L(\boldsymbol{\beta};\sigma^2)
+  =
+  -\dfrac{n}{2}\log(2\pi)
+  -\dfrac{n}{2}\log\sigma^2
+  -\sum\limits_{i=1}^{n}
+  \dfrac{\big(y_i - g(\,\cdot\,;\boldsymbol{\beta})\big)^2}{2\sigma^2}$
+  – logarytm funkcji wiarygodności,
+  
+  \item $S(\boldsymbol{\beta})
+  = \|Y - g(x;\boldsymbol{\beta})\|^2$
+  – kwadrat normy wektorów $Y$ i $g(x;\boldsymbol{\beta})$.
+\end{itemize}
+
+Kolejne kroki algorytmu są następujące:
+
+\begin{itemize}
+  \item wybieramy punkt startowy parametrów
+  $\boldsymbol{\beta}^{(0)} \in \mathbb{R}^p$
+  oraz liczby $\varepsilon > 0$ i $M \in \mathbb{N}_+$,
+  
+  \item tworzymy ciąg iteracji:
+  \[
+    \boldsymbol{\beta}^{(j+1)}
+    =
+    \boldsymbol{\beta}^{(j)}
+    +
+    \bigl[(G^{(j)})^T G^{(j)}\bigr]^{-1}
+    (G^{(j)})^T
+    \bigl[Y - g(X;\boldsymbol{\beta}^{(j)})\bigr],
+  \]
+  
+  \item algorytm zatrzymujemy w kroku $m$, jeśli
+  \[
+    \|\boldsymbol{\beta}^{(m)} - \boldsymbol{\beta}^{(m-1)}\| \le \varepsilon
+    \quad \text{lub} \quad m = M,
+  \]
+  
+  gdzie zgodnie z treścią zadania kładziemy
+  $$\varepsilon=0.0001, \qquad M=100.$$
+  
+  \item przyjmujemy wówczas, że
+  $\hat{\boldsymbol{\beta}} = \boldsymbol{\beta}^{(m)}$
+  oraz
+  $\hat{\sigma}^2 = \hat{\sigma}^2(\hat{\boldsymbol{\beta}})$.
+\end{itemize}
+
+W przypadku gdy macierz $(G^{(j)})^T G^{(j)}$ jest nieodwracalna,
+liczymy uogólnioną macierz odwrotną np. za pomocą funkcji \textit{ginv()} 
+z pakietu \texttt{MASS}.
+
+Implementujemy zatem opisany wyżej algorytm.
+
+Rozpoczynamy od wzorów na $G^{(j)}$ w funkcji \textit{G.j()}.
+```{r}
+M <- 100
+epsilon <- 0.0001
+
+G.j <- function(x, beta.1, beta.2, beta.3) {
+  g.1 <- x / (beta.2 + x)
+  g.2 <- -(beta.1 * x) / (beta.2 + x)^2
+  g.3 <- rep(1, length(x))
+  return(cbind(g.1, g.2, g.3))
+}
+```
+
+Następnie implementujemy wzory na ciag iteracji $\beta^{(j)}$
+w funkcji \textit{beta.j()}.
+```{r}
+beta.j <- function(x, y, beta.1, beta.2, beta.3) {
+  G <- G.j(x, beta.1, beta.2, beta.3)
+  g_vec <- g(x, beta.1, beta.2, beta.3)
+  residuals <- y - g_vec
+  GTG <- t(G) %*% G
+  delta <- ginv(GTG) %*% t(G) %*% residuals
+  beta_new <- c(beta.1, beta.2, beta.3) + as.vector(delta)
+  return(beta_new)
+}
+```
+
+Pozostaje już zaimplementować sam algorytm Gaussa-Newtona 
+w funkcji \textit{Gauss.Newton()}.
+
+```{r}
+Gauss.Newton <- function(x, y, beta.1, beta.2, beta.3, M, epsilon) {
+  beta_curr <- c(beta.1, beta.2, beta.3)
+  n <- length(x)
+  
+  result <- matrix(NA, nrow = M + 1, ncol = 4)
+  
+  # Krok startowy
+  residuals_start <- y - g(x, beta_curr[1], beta_curr[2], beta_curr[3])
+  sigma2_start <- sum(residuals_start^2) / n
+  result[1, ] <- c(beta_curr, sigma2_start)
+  
+  for (j in 1:M) {
+    beta_new <- beta.j(x, y, beta_curr[1], beta_curr[2], beta_curr[3])
+    
+    residuals <- y - g(x, beta_new[1], beta_new[2], beta_new[3])
+    sigma2 <- sum(residuals^2) / n
+    
+    result[j + 1, ] <- c(beta_new, sigma2)
+    if (norm(beta_new - beta_curr, type = "2") <= epsilon) {
+      result <- result[1:(j + 1), , drop = FALSE]
+      break
+    }
+    
+    beta_curr <- beta_new
+  }
+  
+  return(result)
+}
+```
+
+oraz funkcję wiarogodności opisaną powyżej.
+
+```{r}
+wiarogodnosc <- function(x, y, beta.1, beta.2, beta.3, sigma) {
+  n <- length(x)
+  residuals <- y - g(x, beta.1, beta.2, beta.3)
+  L <- -n/2 * log(2 * pi) - n/2 * log(sigma^2) - sum(residuals^2) / (2 * sigma^2)
+  return(L)
+}
+```
+
+# Zadanie 4
+<!-- 
+Zilustrować działanie algorytmu tabelą przedstawiającą wartości estymatorów 
+oraz odpowiadające im wartości logarytmu funkcji
+wiarygodności dla kroków s = 0, 1, 2 oraz s = ostatni.
+-->
+
+
+
+```{r, echo=FALSE}
+
+tab.1<-Gauss.Newton(x,y,
+                    beta.1 = 8,
+                    beta.2 = 2,
+                    beta.3 = 1,
+                    M = M,
+                    epsilon = epsilon)
+
+w <- numeric(nrow(tab.1))
+
+for (i in 1:nrow(tab.1)) {
+  w[i] <- wiarogodnosc(x,
+                       y,
+                       tab.1[i,1],
+                       tab.1[i,2],
+                       tab.1[i,3],
+                       sqrt(tab.1[i,4]))
+}
+
+m1 <- nrow(tab.1)
+
+tab.1.df <- data.frame(kroki = 1:m1,
+                       tab.1,
+                       w)
+
+tab.1.df[m1,1] <- paste(tab.1.df[m1,1],"(ostatni)")
+
+colnames(tab.1.df) <- c("kroki algorytmu",
+                        "$\\hat{\\beta_1}^{(s)}$",
+                        "$\\hat{\\beta_2}^{(s)}$",
+                        "$\\hat{\\beta_3}^{(s)}$",
+                        "$\\hat{\\sigma^2}^{(s)}$",
+                        "$L\\left(\\hat{\\beta}^{(s)},\\hat{\\sigma^2}^{(s)}\\right)$")
+
+```
+
+
+```{r, results="asis", message=FALSE, echo=FALSE}
+print(xtable(tab.1.df, digits = c(1,1,5,5,5,7,7)),
+      sanitize.text.function=function(x){x},
+      comment = FALSE,
+      include.rownames=FALSE)
+```
+
+Wnioski: Algorytm zatrzymał się po 12 krokach, spełniając przyjęte kryterium stopu. Otrzymane estymatory odbiegają od prawdziwych wartości parametrów, co sugeruje zbieżność do lokalnego, a nie globalnego minimum funkcji sumy kwadratów residuów. Spowodowane to jest prawdopodobnie źle dobranym punktem startowym.
+
+# Zadanie 5
+<!-- 
+Porównać hat(beta) z beta
+-->
+
+```{r, results="asis", echo=FALSE}
+beta.hat <- as.numeric(tab.1.df[nrow(tab.1.df), 2:4])
+porownanie <- data.frame(
+  parametr = c("beta1", "beta2", "beta3"),
+  prawdziwe = c(10, 3, 2),
+  estymowane = round(beta.hat, 5)
+)
+print(xtable(porownanie, digits = c(0, 0, 2, 5)),
+      include.rownames = FALSE,
+      comment = FALSE)
+```
+
+Wnioski: Estymatory parametrów $\beta_2$ i $\beta_3$ znacznie odbiegają od prawdziwych wartości, natomiast $\beta_1$ jest stosunkowo dobrze oszacowany
+
+
+# Zadanie 6
+<!-- 
+Na jednym rysunku przedstawić wykresy 
+
+{(x_i, y_i) : i = 1, . . . , n} 
+
+oraz
+
+{(x_i, hat(y_i) : i = 1, . . . , n}.
+-->
+
+```{r wykresy}
+y.hat <- g(x, beta.hat[1], beta.hat[2], beta.hat[3])
+
+plot(x, y, pch = 16, col = "blue",
+     xlab = "x", ylab = "y",
+     main = "Obserwacje vs dopasowanie")
+lines(x, y.hat, pch = 17, col = "red", type = "b")
+legend("bottomright",
+       legend = c("obserwowane", "dopasowane"),
+       col = c("blue", "red"),
+       pch = c(16, 17))
+```
+
+
+Wnioski: Na wykresie widać, że krzywa dopasowana przebiega blisko punktów obserwowanych, jednak ze względu na błędne estymatory parametrów dopasowanie nie oddaje w pełni prawdziwej zależności między zmiennymi.
+
+
+# Zadanie 7
+<!-- 
+Oszacować macierz kowariancji estymatora beta.
+-->
+
+Wobec wzoru na macierz kowariancji estymatora najmniejszych kwadratów w modelu 
+regresji liniowej, przyjmujemy że (macierz $G$ pełni rolę macierzy $X$ z modelu 
+regresji)
+$$
+Cov(\hat{\beta}) = \sigma^2 (G^T G)^{-1}
+$$
+Aby otrzymać estymator $Cov(\hat{\beta})$ zastępujemy nieznany wektor $\beta$ 
+(w $G$) wektorem $\hat{\beta}$, a wariancję $\sigma^2$ szacujemy za pomocą błędu
+średniokwadratowego
+$$
+s^2 = \frac{\sum\limits_{i=1}^{n}\left[y_i - g(x_i,\hat{\beta})\right]^2}{n-p}.
+$$
+
+```{r}
+kowariancja <- function(s.kwadrat, G) {
+  return(s.kwadrat * ginv(t(G) %*% G))
+}
+```
+
+
+```{r kow dla tab.1, results="asis", echo=FALSE}
+n <- length(x)
+p <- 3
+beta.hat <- as.numeric(tab.1.df[nrow(tab.1.df), 2:4])
+G.hat <- G.j(x, beta.hat[1], beta.hat[2], beta.hat[3])
+s.kwadrat <- sum((y - g(x, beta.hat[1], beta.hat[2], beta.hat[3]))^2) / (n - p)
+cov.beta <- kowariancja(s.kwadrat, G.hat)
+print(xtable(cov.beta, digits = 5),
+      comment = FALSE)
+```
+
+
+Wnioski: Oszacowana macierz kowariancji estymatora $\hat{\beta}$ wskazuje na stosunkowo duże wariancje poszczególnych estymatorów oraz silne współliniowości między nimi, co potwierdza niepoprawność otrzymanego rozwiązania.
+
+
+# Zadanie 8
+<!-- 
+Za pomocą algorytmu Gaussa–Newtona wyznaczyć estymatory parametrów 
+beta_1, beta_2, beta_3, sigma^2 dla dwóch innych punktów startowych:
+(9.7, 2.9, 2) oraz (1,1,1).
+-->
+
+```{r tab.2 oraz tab.3}
+tab.2 <- Gauss.Newton(x, y, beta.1 = 9.7, beta.2 = 2.9, beta.3 = 2,
+                      M = M, epsilon = epsilon)
+
+tab.3 <- Gauss.Newton(x, y, beta.1 = 1, beta.2 = 1, beta.3 = 1,
+                      M = M, epsilon = epsilon)
+```
+
+# Zadanie 9
+<!-- 
+Porównać wartości estymatorów beta_1, beta_2, beta_3, sigma^2 otrzymane 
+dla trzech punktów startowych.
+-->
+
+```{r, results="asis", echo=FALSE}
+get.last <- function(tab) round(tab[nrow(tab), ], 5)
+
+tab.1.mat <- Gauss.Newton(x, y, beta.1 = 8, beta.2 = 2, beta.3 = 1, M = M, epsilon = epsilon)
+
+porownanie.all <- data.frame(
+  punkt.startowy = c("(8, 2, 1)", "(9.7, 2.9, 2)", "(1, 1, 1)"),
+  beta1.hat = c(get.last(tab.1.mat)[1], get.last(tab.2)[1], get.last(tab.3)[1]),
+  beta2.hat = c(get.last(tab.1.mat)[2], get.last(tab.2)[2], get.last(tab.3)[2]),
+  beta3.hat = c(get.last(tab.1.mat)[3], get.last(tab.2)[3], get.last(tab.3)[3]),
+  sigma2.hat = c(get.last(tab.1.mat)[4], get.last(tab.2)[4], get.last(tab.3)[4])
+)
+print(xtable(porownanie.all, digits = c(0, 0, 5, 5, 5, 5)),
+      include.rownames = FALSE,
+      comment = FALSE)
+```
+
+Wnioski: Dla punktów startowych $(8,2,1)$ oraz $(9.7,2.9,2)$ algorytm zbiegł do tego samego lokalnego minimum, natomiast dla punktu startowego $(1,1,1)$ otrzymano zupełnie inne rozwiązanie z wyraźnie większą wariancją residuów. Wynika z tego, że algorytm Gaussa-Newtona jest wrażliwy na wybór punktu startowego i nie gwarantuje znalezienia globalnego minimum.
+
+
+
+

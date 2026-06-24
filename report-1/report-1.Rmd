@@ -1,0 +1,595 @@
+---
+title: "Raport z listy 1"
+subtitle: "Modele regresji i ich zastosowania"
+author: "Ksawery Józefowski,   album 277513"
+date: "`r Sys.Date()`"
+output: 
+  pdf_document:
+    toc: true
+    fig_caption: yes
+    fig_width: 5 
+    fig_height: 4 
+    number_sections: true
+header-includes:
+   - \usepackage[OT4]{polski}
+   - \usepackage[utf8]{inputenc}
+   - \usepackage{graphicx}
+   - \usepackage{float}
+fontsize: 12pt 
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, cache = TRUE)
+knitr::opts_chunk$set(warning = FALSE, message = FALSE) 
+knitr::opts_chunk$set(fig.pos = "H", out.extra = "", fig.align = "center")
+```
+
+\newpage
+# Wstęp
+<!-- Wczytaj do pakietu statystycznego dane (x1, y1), . . . , (xn, yn) z pliku 
+„lab 1 i 2.xlsx”.
+-->
+
+Wczytujemy dane z pliku *lab 1 i 2.xlsx*.
+```{r dane}
+library(readxl)
+dane <- read_excel("C:/Users/ksawe/Desktop/MREG/lab 1 i 2.xlsx")
+x <- dane$x
+y <- dane$y
+```
+
+
+# Zadanie 1
+<!-- 
+Dla każdej ze zmiennych y i x występujących się w pliku wyznacz 
+podstawowe wskaźniki numeryczne charakteryzujące próbę:
+- średnią, 
+- wariancję, 
+- odchylenie standardowe,
+- medianę, 
+- pierwszy kwartyl
+- trzeci kwartyl, 
+- minimum
+- maksimum.
+-->
+
+Wykorzystamy funkcję *wskazniki.statystyczne()*.
+
+```{r wskazniki-ogolne}
+wskazniki.statystyczne <- function(x){
+  wskazniki <- matrix(c(mean(x), var(x),
+                        sd(x), median(x),
+                        quantile(x, 0.25), quantile(x, 0.75),
+                        min(x), max(x))
+                      , nrow=8, ncol=1)
+
+  rownames(wskazniki)<-c('średnia', "wariancja", "odchylenie standardowe",
+                       "mediana", "pierwszy kwartyl", "trzeci kwartyl",
+                       "minimum","maksimum")
+return(wskazniki)
+}
+```
+
+Wyznaczamy szukane wskaźniki statystyczne dla zmiennych $x$ oraz $y$.
+```{r wskazniki-x-y}
+x.stat <- wskazniki.statystyczne(x)
+y.stat <- wskazniki.statystyczne(y)
+```
+
+Wyniki zebrano w tabeli \ref{tab-wskazniki-statystyczne}.
+
+```{r tab-stat, echo=FALSE, eval=TRUE, results='asis'}
+library(xtable) 
+tab1 <- xtable(cbind(x.stat, y.stat),
+                caption="Wskaźniki statystyczne dla zmiennych x i y",
+                label="tab-wskazniki-statystyczne")
+ colnames(tab1) <- c("zmienna x", "zmienna y")
+ print(tab1, type = "latex", table.placement = "H", comment=FALSE)
+```
+
+
+Wnioski: Wskaźniki dla zmiennej y są wyraźnie większe niż dla zmiennej x. W obu przypadkach wartości średniej i mediany są do siebie bardzo zbliżone, co wskazuje, że rozkłady tych zmiennych są w przybliżeniu symetryczne.
+
+# Zadanie 2
+<!-- 
+Wykonaj wykres rozrzutu zmiennych y i x oraz oblicz próbkowy współczynnik
+korelacji tych zmiennych. Uzasadnij, że do opisu zależności
+między zmiennymi x i y można wykorzystać model regresji liniowej 
+-->
+
+Próbkowy współczynnik korelacji Pearsona wyraża się wzorem
+$$
+r=\frac{\sum\limits_{i=1}^{n}(x_i - \overline{x}) \cdot (y_i - \overline{y})}{\sqrt{\sum\limits_{i=1}^{n}(x_i - \overline{x})^2\cdot \sum\limits_{i=1}^{n}(y_i - \overline{y})^2}}
+$$
+i jest zaimplementowany w funkcji *cor()*.
+Próbkowa wartość współczynnika korelacji Pearsona wynosi zatem `r cor(x, y)`.
+
+Wykres rozrzutu zmiennych $x,y$ jest przedstawiony na rysunku \ref{fig:wykres-rozrzutu-xy}
+```{r wykres-rozrzutu-xy, echo=TRUE, eval=TRUE, fig.cap="Wykres rozrzutu dla zmiennych x oraz y"}
+plot(x, y,
+     main = "Wykres rozrzutu dla zmiennych x oraz y",
+     xlab = "x",
+     ylab = "y")
+```
+
+
+Wnioski: Można zastosować model regresji liniowej, ponieważ wykres rozrzutu wskazuje na istnienie liniowej zależności między zmiennymi, a współczynnik korelacji Pearsona przyjmuje wartość bliską 1, co świadczy o silnej zależności między nimi.
+
+# Zadanie 3
+<!-- 
+Wyznacz wartości estymatorów najmniejszych kwadratów 
+parametrów beta.0 oraz beta.1 
+-->
+
+Estymatory MNK (metody najmniejszych kwadratów, ang. LSE=Least Squares Errors)
+parametrów $\beta_0$ oraz $\beta_1$ są dane wzorami
+$$
+\hat{\beta_1}=\frac{\sum\limits_{i=1}^{n}(x_i-\overline{x})\cdot(y_i-\overline{y})}{\sum\limits_{i=1}^{n}(x_i-\overline{x})^2}, \qquad \hat{\beta_0}=\overline{y}-\hat{\beta_1}\overline{x}.
+$$
+Wartości estymowanych współczynników możemy wyznaczyć 
+przy użyciu funkcji *estymatory()*.
+
+```{r estymatory}
+estymatory<-function(x,y){
+  beta1 <- sum((x - mean(x)) * (y - mean(y)))/sum((x-mean(x))^2)  
+  beta0 <- mean(y) - beta1 * mean(x)
+  return(c(beta0, beta1))
+}
+```
+
+
+```{r oszacowania beta0 oraz beta1}
+beta0 <- estymatory(x,y)[1]
+beta1 <- estymatory(x,y)[2]
+```
+
+Otrzymujemy oszacowania $\hat{\beta_0}=$ `r beta0` oraz 
+$\hat{\beta_1}=$ `r beta1`.
+
+# Zadanie 4
+<!-- 
+Znajdź wartość estymatora parametru sigma^2. Im więcej predyktorów to dzielimy przez n - liczba predyktorów (beta0 i beta1) daje 2
+-->
+Estymator $\sigma^2$ wyraża się wzorem
+$$
+\hat{\sigma^2} = \frac{1}{n-2}\sum\limits_{i=1}^{n}(y_i-\hat{y_i})^2,
+$$
+gdzie $\hat{y_i}$ oznacza prognozowaną przez model wartość zmiennej objaśnianej 
+$y_i$, odpowiadającą wartości $x_i$, zmiennej objaśniającej x.
+Zatem 
+$$
+\hat{y_i}= \hat{\beta_0} + \hat{\beta_1}\cdot x_i.
+$$
+
+Do wyznaczenia estymatora parametru $\sigma^2$ użyjemy odpowiednio funkcji 
+*prognoza()* oraz *sigma2()*.
+
+```{r prognoza.sigma.kwadrat}
+prognoza <- function(x, beta0, beta1){
+  y.est <- beta0 + beta1 * x
+  return(y.est)
+}
+
+sigma2 <- function(y,y.est){
+  n <- length(y)
+  sigma2.est <- (1/(n-2)) * sum((y - y.est)^2)
+  return(sigma2.est)
+}
+```
+
+```{r estymacja prognoza oraz sigmakwadrat}
+y.est <- prognoza(x, beta0, beta1)
+sigma2.est <- sigma2(y, y.est)
+```
+
+Otrzymujemy zatem, że $\hat{\sigma^2}=$ `r sigma2.est`.
+
+# Zadanie 5
+<!-- 
+Na poziomie istotności alpha = 0.05 zweryfikuj
+hipotezę H0 : beta.1 = 0 przy hipotezie alternatywnej H1 : beta.1 \neq 0.
+-->
+
+Na poziomie istotności $\alpha = 0.05$ weryfikujemy następującą hipotezę:
+
+$$
+H_0: \beta_1=0, \qquad H_1: \beta_1\neq0
+$$
+
+W tym celu definiujemy statystykę $SE_{\beta_1}^2$ wzorem
+
+$$
+SE_{\beta_1}^2 \colon = \frac{\hat{\sigma^2}}{\sum\limits_{i=1}^{n}(x_i-\overline{x})^2}
+$$
+Jeśli hipoteza $H_0$ jest prawdziwa, to statystyka testowa ma postać
+
+$$
+T\colon=\frac{\hat{\beta_1}}{SE_{\beta_1}}
+$$
+
+a jej rozkład to rozkład t-Studenta z $n-2$ stopniami swobody tj. $t_{n-2}$.
+Skoro test odrzuca hipotezę zerową $H_0$, gdy $|T|\geq t_{\alpha/2, n-2}$, to
+p-value (p-wartość) wyznaczamy ze wzoru
+
+$$
+\text{p-value} = 2 \mathbb{P}(|T| \geq|T_{obs}|) = 2(1 - F_{n-2}(|T_{obs}|))
+$$
+gdzie $F_{n-2}(T_{obs})$ jest dystrybuantą rozkładu $t_{n-2}$ 
+dla zaobserwonej wartości $T_{obs}$ statystyki $T$.
+
+Do weryfikacji rozważanej hipotezy wykorzystamy funkcję *test.istotności()*.
+
+```{r test.istotnosci}
+test.istotnosci<-function(sigma2.est, x, beta1, alpha){
+  SE2.beta1 <-sigma2.est / sum((x-mean(x))^2)
+  T.stat <- beta1 / sqrt(SE2.beta1)
+  t <- qt(1-alpha/2, length(x)-2)
+  p.value <- 2*pt(abs(T.stat), length(x-2), lower.tail = FALSE)
+  
+  
+  y <- matrix(c(T.stat, t, p.value), ncol=3, nrow=1)
+  colnames(y)<-c("Statystyka testowa","Kwantyl rzędu 1-alpha/2","p-value")
+return(y)
+}
+```
+
+Tutaj $p-value$ wynosi `r test.istotnosci(sigma2.est, x, beta1, 0.05)[3]`
+
+Wnioski: Ponieważ wartość p-value jest mniejsza niż 0.05, odrzucamy hipotezę zerową $H_0$. Oznacza to, że współczynnik kierunkowy jest statystycznie istotny, a więc zmienna objaśniająca ma istotny wpływ na zmienną objaśnianą. W konsekwencji model regresji liniowej można uznać za istotny statystycznie.
+
+Dokładne wyniki przeprowadzonego testu istotności współczynnika $\beta_1$
+są podane w tabeli \ref{tab-test-istotnosci}.
+
+```{r tab-test-istotnosci, echo=FALSE, eval=TRUE, results='asis'}
+tab2 <- xtable(test.istotnosci(sigma2.est, x, beta1, 0.05),
+                caption="Wyniki testu istotności współczynników 
+                         modelu regresji",
+                label="tab-test-istotnosci")
+print(tab2, type = "latex", table.placement = "H", 
+       comment=FALSE, include.rownames=FALSE)
+```
+
+
+
+
+# Zadanie 6
+<!-- 
+Skonstruuj przedział ufności dla beta.1 na poziomie ufności 0.99. 
+-->
+
+Do wyznaczenia realizacji przedziału ufności $[T_L(X),T_U(X)]$ 
+na poziomie ufności $1-\alpha$ dla parametru $\beta_1$, przy
+założeniu, że $\varepsilon_1,\varepsilon_2,\ldots,\varepsilon_n \ i.i.d$ 
+o rozkładzie $\mathcal{N}(0,\sigma^2)$ wykorzystamy wzory
+
+$$
+T_L(X)=\hat{\beta_1}-t_{\alpha/2, n-2}\cdot SE_{\beta_1}, \qquad 
+T_U(X)=\hat{\beta_1}+t_{\alpha/2, n-2}\cdot SE_{\beta_1}
+$$
+
+i zaimplementujemy je w funkcji *przedzial.ufnosci.beta()*.
+
+```{r przedzial.ufnosci}
+przedział.ufności.beta <- function(sigma2.est,x,beta1,alpha){
+  SE2.beta1 <-sigma2.est / sum((x-mean(x))^2)
+  t <- qt(1-alpha/2, length(x)-2)
+  t.lower <- beta1 - t * sqrt(SE2.beta1)
+  t.upper <- beta1 + t * sqrt(SE2.beta1)  
+  y<-matrix(c(t.lower,t.upper),ncol=2,nrow=1)
+  colnames(y)<-c("T-lower","T-upper")
+return(y)
+}
+
+t.beta1 <- przedział.ufności.beta(sigma2.est,x,beta1,0.01)
+```
+
+Realizacja przedziału ufności parametru $\beta_1$ na poziomie ufności 
+$1-\alpha=0.99$ wynosi [`r t.beta1`]
+
+# Zadanie 7
+<!-- 
+Dla x0 = 1 oblicz prognozowaną przez model wartość Y(x0).
+Następnie wyznacz przedziały ufności na poziomie ufności 0.99 dla Y(x0).
+-->
+
+Do wyznaczenia realizacji przedziału ufności $[T_L(X),T_U(X)]$ 
+na poziomie ufności $1-\alpha$ dla wartości $Y(x_0)$ prognozowanej przez model,
+przy założeniu, że $\varepsilon_1,\varepsilon_2,\ldots,\varepsilon_n \ i.i.d$ 
+o rozkładzie $\mathcal{N}(0,\sigma^2)$, wykorzystamy wzory
+
+$$
+T_L(X)=\hat{Y(x_0)}-t_{\alpha/2, n-2}\cdot SE_{\hat{Y(x_0)}-Y(x_0)}, \qquad 
+T_U(X)=\hat{Y(x_0)}+t_{\alpha/2, n-2}\cdot SE_{\hat{Y(x_0)}-Y(x_0)},
+$$
+gdzie
+$$
+\hat{Y(x_0)} = \hat{\beta_0} + \hat{\beta_1} \cdot x_0
+$$
+
+oraz
+
+$$
+SE^2_{\hat{Y(x_0)}-Y(x_0)} = \hat{\sigma^2}\left(1 + \frac1n + 
+\frac{(x_0-\overline{x})^2}{\sum\limits_{i=1}^{n}(x_i-\overline{x})^2}\right).
+$$
+i zaimplementujemy je w funkcji *przedział.ufności.prognoza()*, przy czym
+przyjmujemy, że $x_0 = 1$ a poziom ufności to $1-\alpha = 0.99$.
+
+```{r}
+przedział.ufności.prognoza<-function(sigma2.est, x, alpha, x_0, y_0){
+  SE2.y <- sigma2.est * (1 + 1/length(x) + (x_0 - mean(x))^2 / (sum((x - mean(x))^2)))
+  t <- qt(1-alpha/2, length(x)-2)
+  y.pred <- prognoza(x_0, beta0, beta1)
+  
+  t.lower <- y.pred - t * sqrt(SE2.y)
+  t.upper <- y.pred + t * sqrt(SE2.y) 
+  
+  y <- matrix(c(t.lower,t.upper),ncol=2,nrow=1)
+  colnames(y)<-c("T-lower","T-upper")
+  return(y)
+  }
+```
+
+```{r}
+x_0 <- 1
+y_0 <- prognoza(x_0, beta0, beta1)
+t.prognoza <- przedział.ufności.prognoza(sigma2.est, x, 0.01, x_0, y_0)
+```
+
+Realizacja przedziału ufności dla wartości prognozowanej $\hat{Y(x_0)}=$ `r y_0`
+na poziomie ufności $1-\alpha=0.99$ wynosi [`r t.prognoza`]
+
+# Zadanie 8
+<!-- 
+Narysuj histogram i wykres kwantylowy dla rezyduów.
+
+Narysuj też wykresy rozrzutu dla prób
+(by1, e1), . . . , (byn, en),
+(x1, e1), . . . , (xn, en). 
+
+Czy na podstawie tych rysunków można stwierdzić, że któreś założeń modelu
+regresji nie jest spełnione (patrz zadanie teoretyczne 2d)?
+-->
+Wyznaczmy rezydua dla naszego modelu w oparciu o wartości zmiennych x i y
+za pomocą funkcji *rezydum()*.
+
+```{r}
+rezydum<-function(y,y_0){
+  y - y_0
+}
+```
+
+
+Histogram rezyduów jest przedstawiony na rysunku \ref{fig:rezydua_histogram}.
+```{r rezydua_histogram, echo=FALSE, fig.cap="Histogram rezyduów"}
+rezydua <- rezydum(y, y.est)
+
+hist(rezydua,
+     main = "Histogram rezyduów",
+     xlab = "Rezydua",
+     ylab = "Liczność")
+```
+
+Wykres kwantylowy rezyduów jest przedstawiony na rysunku \ref{fig:rezydua_histogram}.
+```{r rezydua_wykres_kwantylowy, echo=FALSE, fig.cap="Wykres kwantylowy rezyduów"}
+qqnorm(rezydua,
+       main = "Wykres kwantylowy rezyduów")
+qqline(rezydua, col="red")
+```
+
+Wykres rozrzutu rezyduów względem estymowanych wartości jest przedstawiony na rysunku \ref{fig:rezydua_rozrzut_prognozy}.
+```{r rezydua_rozrzut_prognozy, echo=FALSE, fig.cap="Wykres rozrzutu rezyduów względem prognoz"}
+plot(y.est, rezydua,
+     main = "Rezydua względem prognoz",
+     xlab = "Prognozowane wartości",
+     ylab = "Rezydua")
+```
+
+Wykres rozrzutu rezyduów względem wartości zmiennej $x$ jest przedstawiony na rysunku \ref{fig:rezydua_rozrzut_x}.
+```{r rezydua_rozrzut_x, echo=FALSE, fig.cap="Wykres rozrzutu rezyduów względem wartości zmiennej x"}
+plot(x, rezydua,
+     main = "Rezydua względem x",
+     xlab = "x",
+     ylab = "Rezydua")
+abline(h = 0)
+```
+Wnioski: Histogram rezyduów wskazuje, że ich rozkład jest zbliżony do normalnego. Potwierdza to również wykres kwantyl–kwantyl, choć widoczne są pojedyncze obserwacje odstające na krańcach rozkładu. Wykres rozrzutu rezyduów względem wartości prognozowanych nie wskazuje na istotną zależność ani wyraźny wzorzec. Również wykres rozrzutu rezyduów względem wartości zmiennej $x$ nie wykazuje istotnej korelacji ani systematycznej struktury punktów.
+
+# Zadanie 9
+<!-- 
+Zmodyfikuj dane z pliku lab 1 i 2.xlsx, mnożąc przez 10 ostatnią wartość
+zmiennej objaśnianej. 
+
+Wyznacz estymatory najmniejszych kwadratów
+parametrów beta.0 i beta.1 i porównaj je z estymatorami otrzymanymi poprzednio.
+
+Czy ta zmodyfikowana obserwacja jest: 
+
+- obserwacją odstającą? 
+- obserwacją wpływową?
+-->
+
+Modyfikujemy ostatnią wartość zmiennej $y$ i wyznaczamy nowe estymatory 
+parametrów $\beta_0$ oraz $\beta_1$.
+```{r y.nowe}
+y.new <- y
+y.new[length(y.new)] <- 10 * y.new[length(y.new)]
+beta.new <- estymatory(x, y.new)
+beta0.new <- beta.new[1]
+beta1.new <- beta.new[2]
+
+beta0.new
+beta1.new
+```
+
+
+Wnioski: Modyfikacja ostatniej wartości zmiennej $y$ znacząco wpływa (jest wpływowa) na wartości estymatorów $\hat{\beta}_0$ oraz $\hat{\beta}_1$. W przypadku $\hat{\beta}_1$ współczynnik kierunkowy zmienia znak z dodatniego na ujemny. Świadczy to o dużej wrażliwości modelu na tę obserwację. Można ją uznać za obserwację odstającą, ponieważ wyraźnie odbiega od pozostałych danych.
+
+
+# Zadanie 10
+<!-- 
+Niech 
+n = 200,
+x1, x2, . . . , xn iid U(−2, 2),
+eps.1, eps.2, . . . , eps.n iid N(0, sigma^2),
+sigma = 0.1, beta.0 = 1, beta.1 = 2.
+-->
+
+Generujemy próby $(x_1,x_2,\ldots,x_n)$ oraz 
+$(\varepsilon_1, \varepsilon_2,\ldots,\varepsilon_n)$.
+
+```{r zadanie-10-dane}
+n <- 200
+beta.0 <- 1
+beta.1 <- 2
+sigma <- 0.1
+x.10 <- runif(n, -2, 2)
+```
+
+
+## Podpunkt (a)
+<!--
+Wygeneruj obserwacje y1, y2, . . . , yn, takie że
+yi = beta.0 + beta.1 · xi + eps.i, i = 1, . . . , n
+--->
+
+Tworzymy funkcję *generuj_y* do generowania próby $(y_1,y_2,\ldots,y_n)$.
+```{r}
+generuj_y <- function(beta.0, beta.1, x.10, sigma){
+  eps <- rnorm(n, mean=0, sd=sigma)
+  y <- beta.0 + beta.1 * x.10 + eps
+  return(y)
+}
+
+y.10 <- generuj_y(beta.0, beta.1, x.10, sigma)
+```
+
+
+
+## Podpunkt (b)
+<!--
+Wykonaj wykres rozproszenia dla próby (x1, y1), . . . , (xn, yn).
+Czy chmura punktów ma (w przybliżeniu) charakter liniowy? 
+--->
+
+Wykres rozproszenia jest pokazany na rysunku \ref{fig:Wykres-rozrzutu-próby}
+```{r Wykres-rozrzutu-próby, echo=FALSE, fig.cap="Wykres rozrzutu próby"}
+plot(x.10, y.10,
+     main="Wykres rozrzutu próby (x_i, y_i)",
+     xlab="x",
+     ylab="y",
+     pch=19, col="blue")
+
+```
+Wnioski: Chmura punktów na wykresie rozrzutu dla nowej próby ma charakter liniowy, co wskazuje na występowanie korelacji między zmiennymi. Wynika to ze sposobu generowania danych.
+
+## Podpunkt (c)
+<!--
+W oparciu o próbę (x1, y1), . . . , (xn, yn) wyznacz estymatory najmniejszych
+kwadratów parametrów (beta.0.new, beta.1.new). 
+Porównaj wartości tych estymatorów z wartościami (beta.0, beta.1).
+-->
+
+Wyznaczamy szukane estymatory.
+```{r}
+beta.10 <- estymatory(x.10, y.10)
+beta.0.est <- beta.10[1]
+beta.1.est <- beta.10[2]
+
+# beta.0.est
+# beta.1.est
+```
+
+Wyniki są podane w tabeli \ref{tab-zad10c}.
+```{r tab-10c, echo=FALSE, eval=TRUE, results='asis'}
+tab3 <- matrix(c(beta.0, beta.0.est,
+                beta.1, beta.1.est), nrow=2, byrow=TRUE)
+tab3 <- xtable(tab3,
+               caption="Współczynniki modelu regresji
+               z zadania 10.",
+               label="tab-zad10c", digits = 4)
+colnames(tab3) <- c("Wartość dokładna", "Oszacowanie")
+rownames(tab3) <- c("beta.0", "beta.1")
+print(tab3, type = "latex", table.placement = "H", comment=FALSE)
+
+```
+Wnioski: Nowe estymatory są bardzo zbliżone do wyjściowych estymatorów. Błędy są bardzo małe i wynikają z dodania szumu gaussowskiego.
+
+## Podpunkt (d)
+<!--
+Powtórz obliczenia dla sigma = 0.5 i sigma = 1. 
+Jak zmieniają się precyzja estymatorów i współczynnik R2, gdy rośnie sigma^2? 
+-->
+
+Tworzymy funkcję *R2()* do wyznaczania współczynnika determinacji.
+```{r}
+R2 <- function(y, y.est){
+  sum((y.est - mean(y))^2)/sum((y - mean(y))^2)
+}
+
+```
+
+Powtarzamy obliczenia dla $\sigma=0.5$ oraz $\sigma=1$.
+```{r sigma-rozne}
+# Sigma = 0.1
+sigma <- 0.1
+y.0.1 <- generuj_y(beta.0, beta.1, x.10, sigma)
+beta.0.0.1 <- estymatory(x.10, y.0.1)[1]
+beta.1.0.1 <- estymatory(x.10, y.0.1)[2]
+y.est.0.1 <- prognoza(x.10, beta.0.0.1, beta.1.0.1)
+R2.s.0.1 <- R2(y.0.1, y.est.0.1)
+
+# Sigma = 0.5
+sigma <- 0.5
+y.0.5 <- generuj_y(beta.0, beta.1, x.10, sigma)
+beta.0.0.5 <- estymatory(x.10, y.0.5)[1]
+beta.1.0.5 <- estymatory(x.10, y.0.5)[2]
+y.est.0.5 <- prognoza(x.10, beta.0.0.5, beta.1.0.5)
+R2.s.0.5 <- R2(y.0.5, y.est.0.5)
+
+# Sigma = 1
+sigma <- 1
+y.1.0 <- generuj_y(beta.0, beta.1, x.10, sigma)
+beta.0.1.0 <- estymatory(x.10, y.1.0)[1]
+beta.1.1.0 <- estymatory(x.10, y.1.0)[2]
+y.est.1.0 <- prognoza(x.10, beta.0.1.0, beta.1.1.0)
+R2.s.1.0 <- R2(y.1.0, y.est.1.0)
+
+```
+
+
+
+Wyniki podane są w tabeli \ref{tab-zad10d}.
+```{r tab-stat-zadanie10, echo=FALSE, eval=TRUE, results='asis'}
+library(xtable) 
+tab5 <- xtable(cbind(R2.s.0.1, R2.s.0.5, R2.s.1.0),
+              caption="Współczynnik determinacji dla różnych sigma",
+               label="tab-zad10d", digits=4)
+colnames(tab5) <- c("sigma=0.1", "sigma=0.5", "sigma=1")
+print(tab5, type = "latex", table.placement = "H", comment=FALSE)
+```
+```{r}
+c(abs(1-beta.0.0.1),
+  abs(1-beta.0.0.5),
+  abs(1-beta.0.1.0))
+c(abs(2-beta.1.0.1),
+  abs(2-beta.1.0.5),
+  abs(2-beta.1.1.0))
+```
+
+Wnioski: Wraz ze wzrostem $\sigma$, maleje współczynnik dopasowania oraz estymatory $\beta$ są coraz mniej dokładne (błąd rośnie). Jest to zgodne z oczekiwaniami, ponieważ wraz ze wzrostem wariancji rośnie rozproszenie danych, przez co model ma trudność z dokładnym dopasowaniem zależności.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
